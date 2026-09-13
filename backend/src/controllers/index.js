@@ -1,0 +1,11 @@
+export * as healthController from './healthController.js';
+export * as authController from './authController.js';
+export * as userController from './userController.js';
+export * as platformController from './platformController.js';
+export * as submissionController from './submissionController.js';
+export * as problemController from './problemController.js';
+export * as dashboardController from './dashboardController.js';
+export * as contestController from './contestController.js';
+export * as goalController from './goalController.js';
+export * as leaderboardController from './leaderboardController.js';
+export * as adminController from './adminController.js';

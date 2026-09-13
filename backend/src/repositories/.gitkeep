@@ -1,0 +1,2 @@
+# Repositories module
+# Store raw SQL queries and database access functions for users, submissions, problems, etc. here.

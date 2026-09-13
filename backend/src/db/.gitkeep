@@ -1,0 +1,2 @@
+# Database module
+# Store PostgreSQL connection pool setup, schema initialization scripts, and migrations here.
