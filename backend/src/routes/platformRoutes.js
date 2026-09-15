@@ -1,6 +1,12 @@
 import { Router } from 'express';
+import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import SyncService from '../services/syncService.js';
 import {
+  getPlatforms,
+  addPlatform,
+  deletePlatform,
+  syncPlatform,
+  getPlatformStatus,
   syncCodeforces,
   getCodeforcesProfile,
   getCodeforcesSubmissions,
@@ -10,9 +16,22 @@ import {
   getLeetCodeSubmissions,
   getLeetCodeRatingHistory,
   getLeetCodeContestRanking,
+  syncHackerRank,
+  getHackerRankProfile,
+  getHackerRankBadges,
+  getHackerRankScores,
+  getHackerRankSubmissions,
 } from '../controllers/platformController.js';
 
 const router = Router();
+
+// --- Platform Account Management (Linked Accounts) ---
+router.get('/', optionalAuth, getPlatforms);
+router.post('/', requireAuth, addPlatform);
+router.delete('/:platform', requireAuth, deletePlatform);
+router.post('/:platform/sync-account', requireAuth, syncPlatform);
+router.get('/:platform/status', optionalAuth, getPlatformStatus);
+
 
 // --- Codeforces Routes ---
 router.get('/codeforces/:handle', getCodeforcesProfile);
@@ -51,6 +70,29 @@ router.get('/leetcode/:username/sync', async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: `Successfully synchronized LeetCode account @${username}`,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+// --- HackerRank Routes ---
+router.get('/hackerrank/:username', getHackerRankProfile);
+router.get('/hackerrank/:username/badges', getHackerRankBadges);
+router.get('/hackerrank/:username/scores', getHackerRankScores);
+router.get('/hackerrank/:username/submissions', getHackerRankSubmissions);
+router.post('/hackerrank/sync', syncHackerRank);
+
+// Browser-friendly HackerRank sync via GET:
+router.get('/hackerrank/:username/sync', async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const result = await SyncService.syncHackerRank(username);
+    res.status(200).json({
+      success: true,
+      message: `Successfully synchronized HackerRank account @${username}`,
       data: result,
     });
   } catch (err) {

@@ -18,5 +18,5 @@ router.get('/difficulty', getDifficulty);
 router.get('/:identifier/stats', getStats);
 router.get('/:identifier/heatmap', getHeatmap);
 router.get('/:identifier/difficulty', getDifficulty);
-router.get('/:identifier', getStats); 
+router.get('/:identifier', getStats);
 export default router;

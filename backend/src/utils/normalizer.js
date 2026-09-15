@@ -54,21 +54,6 @@ export const normalizeLeetCodeSubmission = (rawSub, userId = null) => {
   };
 };
 
-/**
- * Unified helper to normalize a submission based on platform.
- */
-export const normalizeSubmission = (platform, rawSub, userId = null) => {
-  if (!rawSub) return null;
-  const normalizedPlatform = String(platform || '').toUpperCase();
-
-  if (normalizedPlatform === 'CODEFORCES') {
-    return normalizeCodeforcesSubmission(rawSub, userId);
-  }
-  if (normalizedPlatform === 'LEETCODE') {
-    return normalizeLeetCodeSubmission(rawSub, userId);
-  }
-  return rawSub;
-};
 
 /**
  * Normalizes a raw Codeforces user profile into DevTrack format.
@@ -132,21 +117,6 @@ export const normalizeLeetCodeProfile = (rawUser) => {
   };
 };
 
-/**
- * Unified helper to normalize user profile based on platform.
- */
-export const normalizeUserProfile = (platform, rawUser) => {
-  if (!rawUser) return null;
-  const normalizedPlatform = String(platform || '').toUpperCase();
-
-  if (normalizedPlatform === 'CODEFORCES') {
-    return normalizeCodeforcesProfile(rawUser);
-  }
-  if (normalizedPlatform === 'LEETCODE') {
-    return normalizeLeetCodeProfile(rawUser);
-  }
-  return rawUser;
-};
 
 /**
  * Normalizes LeetCode contest ranking and history.
@@ -179,9 +149,128 @@ export const normalizeLeetCodeContestRanking = (rawContest) => {
   };
 };
 
+/**
+ * Normalizes a raw HackerRank challenge submission into DevTrack format.
+ */
+export const normalizeHackerRankSubmission = (rawChallenge, userId = null) => {
+  const slug = rawChallenge.ch_slug || rawChallenge.slug || 'unknown';
+  const name = rawChallenge.name || slug;
+
+  return {
+    userId: userId || null,
+    platform: 'HACKERRANK',
+    platformSubmissionId: String(slug),
+    problemId: slug,
+    problemName: name,
+    difficulty: 'UNRATED',
+    language: '',
+    verdict: 'ACCEPTED',
+    submittedAt: rawChallenge.created_at ? new Date(rawChallenge.created_at) : new Date(),
+    contestId: rawChallenge.con_slug || null,
+    problemUrl: rawChallenge.url ? `https://www.hackerrank.com${rawChallenge.url}` : `https://www.hackerrank.com/challenges/${slug}`,
+  };
+};
+
+/**
+ * Normalizes a raw HackerRank user profile into DevTrack format.
+ */
+export const normalizeHackerRankProfile = (rawProfile, rawBadges = [], rawScores = []) => {
+  if (!rawProfile) return null;
+
+  const username = rawProfile.username || '';
+  const fullName = rawProfile.name || null;
+
+  // Calculate total challenges solved across badges
+  const totalSolvedFromBadges = Array.isArray(rawBadges)
+    ? rawBadges.reduce((sum, b) => sum + (b.solved || 0), 0)
+    : 0;
+
+  // Extract score if available
+  const topScore = Array.isArray(rawScores)
+    ? rawScores.find((s) => s.slug === 'algorithms' || s.slug === 'data-structures' || s.slug === 'python')
+    : null;
+  const primaryRating = topScore?.practice?.score ? Math.round(topScore.practice.score) : null;
+  const primaryRank = topScore?.practice?.rank || null;
+
+  const formattedBadges = Array.isArray(rawBadges)
+    ? rawBadges.map((b) => ({
+        badgeName: b.badge_name,
+        categoryName: b.category_name,
+        stars: b.stars,
+        totalStars: b.total_stars,
+        solved: b.solved,
+        points: b.current_points,
+        rank: b.hacker_rank,
+      }))
+    : [];
+
+  return {
+    platform: 'HACKERRANK',
+    username,
+    handle: username,
+    name: fullName,
+    realName: fullName,
+    avatar: rawProfile.avatar || null,
+    rating: primaryRating,
+    maxRating: null,
+    rank: primaryRank ? `#${primaryRank}` : `Level ${rawProfile.level || 1}`,
+    ranking: primaryRank,
+    totalSolved: totalSolvedFromBadges,
+    breakdown: {
+      easy: null,
+      medium: null,
+      hard: null,
+    },
+    level: rawProfile.level || null,
+    country: rawProfile.country || null,
+    school: rawProfile.school || null,
+    badges: formattedBadges,
+    profileUrl: username ? `https://www.hackerrank.com/${username}` : null,
+  };
+};
+
+/**
+ * Unified helper to normalize a submission based on platform.
+ */
+export const normalizeSubmission = (platform, rawSub, userId = null) => {
+  if (!rawSub) return null;
+  const normalizedPlatform = String(platform || '').toUpperCase();
+
+  if (normalizedPlatform === 'CODEFORCES') {
+    return normalizeCodeforcesSubmission(rawSub, userId);
+  }
+  if (normalizedPlatform === 'LEETCODE') {
+    return normalizeLeetCodeSubmission(rawSub, userId);
+  }
+  if (normalizedPlatform === 'HACKERRANK') {
+    return normalizeHackerRankSubmission(rawSub, userId);
+  }
+  return rawSub;
+};
+
+/**
+ * Unified helper to normalize user profile based on platform.
+ */
+export const normalizeUserProfile = (platform, rawUser, rawBadges = [], rawScores = []) => {
+  if (!rawUser) return null;
+  const normalizedPlatform = String(platform || '').toUpperCase();
+
+  if (normalizedPlatform === 'CODEFORCES') {
+    return normalizeCodeforcesProfile(rawUser);
+  }
+  if (normalizedPlatform === 'LEETCODE') {
+    return normalizeLeetCodeProfile(rawUser);
+  }
+  if (normalizedPlatform === 'HACKERRANK') {
+    return normalizeHackerRankProfile(rawUser, rawBadges, rawScores);
+  }
+  return rawUser;
+};
+
 // Aliases for versatility
 export const normalizeCodeforcesUser = normalizeCodeforcesProfile;
 export const normalizeLeetCodeUser = normalizeLeetCodeProfile;
+export const normalizeHackerRankUser = normalizeHackerRankProfile;
 export const normalizeProfile = normalizeUserProfile;
 export const normalizeUser = normalizeUserProfile;
 
@@ -189,12 +278,15 @@ export const normalizeUser = normalizeUserProfile;
 export const normalize = (platform, data) => normalizeUserProfile(platform, data);
 normalize.codeforcesProfile = normalizeCodeforcesProfile;
 normalize.leetcodeProfile = normalizeLeetCodeProfile;
+normalize.hackerrankProfile = normalizeHackerRankProfile;
 normalize.codeforcesUser = normalizeCodeforcesProfile;
 normalize.leetcodeUser = normalizeLeetCodeProfile;
+normalize.hackerrankUser = normalizeHackerRankProfile;
 normalize.userProfile = normalizeUserProfile;
 normalize.profile = normalizeUserProfile;
 normalize.codeforcesSubmission = normalizeCodeforcesSubmission;
 normalize.leetcodeSubmission = normalizeLeetCodeSubmission;
+normalize.hackerrankSubmission = normalizeHackerRankSubmission;
 normalize.submission = normalizeSubmission;
 normalize.leetcodeContestRanking = normalizeLeetCodeContestRanking;
 

@@ -1,12 +1,16 @@
 import { Router } from 'express';
+import { optionalAuth } from '../middleware/authMiddleware.js';
 import {
   getSubmissions,
-  getSubmissionById
+  getSubmissionsStats,
+  getSubmissionById,
 } from '../controllers/submissionController.js';
 
 const router = Router();
 
-router.get('/', getSubmissions);
-router.get('/:id', getSubmissionById);
+router.get('/stats', optionalAuth, getSubmissionsStats);
+router.get('/', optionalAuth, getSubmissions);
+router.get('/:id', optionalAuth, getSubmissionById);
 
 export default router;
+

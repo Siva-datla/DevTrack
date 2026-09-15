@@ -1,11 +1,17 @@
 import CodeforcesService from '../services/platforms/codeforcesService.js';
 import LeetCodeService from '../services/platforms/leetcodeService.js';
+import HackerRankService from '../services/platforms/hackerrankService.js';
 import SyncService from '../services/syncService.js';
+import DashboardService from '../services/dashboardService.js';
+import PlatformAccount from '../models/PlatformAccount.js';
+import Submission from '../models/Submission.js';
 import {
   normalizeCodeforcesProfile,
   normalizeCodeforcesSubmission,
   normalizeLeetCodeProfile,
   normalizeLeetCodeContestRanking,
+  normalizeHackerRankProfile,
+  normalizeHackerRankSubmission,
 } from '../utils/normalizer.js';
 
 // --- Codeforces Controllers ---
@@ -163,26 +169,291 @@ export const syncLeetCode = async (req, res, next) => {
   }
 };
 
-// --- Legacy / Generic Handlers ---
+// --- HackerRank Controllers ---
 
-export const getPlatforms = async (req, res) => {
-  res.status(200).json({ success: true, message: 'Get linked platforms template' });
+export const getHackerRankProfile = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const { profile, badges, scores } = await HackerRankService.getUserFullData(username);
+    const normalized = normalizeHackerRankProfile(profile, badges, scores);
+
+    res.status(200).json({
+      success: true,
+      data: normalized,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const addPlatform = async (req, res) => {
-  res.status(200).json({ success: true, message: 'Link new platform template' });
+export const getHackerRankBadges = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const badges = await HackerRankService.getBadges(username);
+
+    res.status(200).json({
+      success: true,
+      count: badges.length,
+      data: badges,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const deletePlatform = async (req, res) => {
-  res.status(200).json({ success: true, message: `Unlink platform ${req.params.platform} template` });
+export const getHackerRankScores = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const scores = await HackerRankService.getScores(username);
+
+    res.status(200).json({
+      success: true,
+      data: scores,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const syncPlatform = async (req, res) => {
-  res.status(200).json({ success: true, message: `Sync platform ${req.params.platform} template` });
+export const getHackerRankSubmissions = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const challenges = await HackerRankService.getRecentChallenges(username, limit);
+    const submissions = challenges.map((ch) => normalizeHackerRankSubmission(ch));
+
+    res.status(200).json({
+      success: true,
+      count: submissions.length,
+      data: submissions,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const getPlatformStatus = async (req, res) => {
-  res.status(200).json({ success: true, message: `Get platform ${req.params.platform} status template` });
+export const syncHackerRank = async (req, res, next) => {
+  try {
+    const username = req.body.username || req.body.handle;
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Username is required in request body' },
+      });
+    }
+
+    const userId = req.user?._id || req.user?.id || null;
+    const result = await SyncService.syncHackerRank(username, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'HackerRank account synced successfully',
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --- Platform Account Management Handlers ---
+
+export const getPlatforms = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id || (await DashboardService.resolveUserId());
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    const platforms = await PlatformAccount.find({ userId }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: platforms.length,
+      data: platforms,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const addPlatform = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id || (await DashboardService.resolveUserId());
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    let { platform, username, handle } = req.body;
+    username = (username || handle || '').trim();
+
+    if (!platform || !username) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Platform and username/handle are required.' },
+      });
+    }
+
+    const normPlatform = String(platform).toUpperCase();
+    const validPlatforms = ['CODEFORCES', 'LEETCODE', 'HACKERRANK'];
+    if (!validPlatforms.includes(normPlatform)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'UNSUPPORTED_PLATFORM',
+          message: `Platform "${platform}" is not supported. Supported platforms: ${validPlatforms.join(', ')}.`,
+        },
+      });
+    }
+
+    // Trigger platform sync and validation
+    let syncResult;
+    if (normPlatform === 'CODEFORCES') {
+      syncResult = await SyncService.syncCodeforces(username, userId);
+    } else if (normPlatform === 'LEETCODE') {
+      syncResult = await SyncService.syncLeetCode(username, userId);
+    } else if (normPlatform === 'HACKERRANK') {
+      syncResult = await SyncService.syncHackerRank(username, userId);
+    }
+
+    const account = await PlatformAccount.findOne({ userId, platform: normPlatform });
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully linked and synced ${normPlatform} account @${username}`,
+      data: {
+        account,
+        syncResult,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deletePlatform = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id || (await DashboardService.resolveUserId());
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    const normPlatform = String(req.params.platform || '').toUpperCase();
+    const account = await PlatformAccount.findOneAndDelete({ userId, platform: normPlatform });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'PLATFORM_NOT_LINKED',
+          message: `No linked account found for platform "${req.params.platform}".`,
+        },
+      });
+    }
+
+    // Also optionally purge synced submissions for that platform and user
+    const purge = req.query.purge !== 'false';
+    let purgedCount = 0;
+    if (purge) {
+      const deleteResult = await Submission.deleteMany({ userId, platform: normPlatform });
+      purgedCount = deleteResult.deletedCount;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully unlinked ${normPlatform} account @${account.username}`,
+      purgedSubmissions: purgedCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const syncPlatform = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id || (await DashboardService.resolveUserId());
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    const normPlatform = String(req.params.platform || '').toUpperCase();
+    const account = await PlatformAccount.findOne({ userId, platform: normPlatform });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'PLATFORM_NOT_LINKED',
+          message: `No linked account found for platform "${req.params.platform}".`,
+        },
+      });
+    }
+
+    let syncResult;
+    if (normPlatform === 'CODEFORCES') {
+      syncResult = await SyncService.syncCodeforces(account.username, userId);
+    } else if (normPlatform === 'LEETCODE') {
+      syncResult = await SyncService.syncLeetCode(account.username, userId);
+    } else if (normPlatform === 'HACKERRANK') {
+      syncResult = await SyncService.syncHackerRank(account.username, userId);
+    }
+
+    const updatedAccount = await PlatformAccount.findOne({ userId, platform: normPlatform });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully synchronized ${normPlatform} account @${account.username}`,
+      data: {
+        account: updatedAccount,
+        syncResult,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPlatformStatus = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id || (await DashboardService.resolveUserId());
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    const normPlatform = String(req.params.platform || '').toUpperCase();
+    const account = await PlatformAccount.findOne({ userId, platform: normPlatform });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'PLATFORM_NOT_LINKED',
+          message: `No linked account found for platform "${req.params.platform}".`,
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: account,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export default {
@@ -195,6 +466,11 @@ export default {
   getLeetCodeRatingHistory,
   getLeetCodeContestRanking,
   syncLeetCode,
+  getHackerRankProfile,
+  getHackerRankBadges,
+  getHackerRankScores,
+  getHackerRankSubmissions,
+  syncHackerRank,
   getPlatforms,
   addPlatform,
   deletePlatform,

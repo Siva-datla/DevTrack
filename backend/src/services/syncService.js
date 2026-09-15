@@ -4,10 +4,13 @@ import PlatformAccount from '../models/PlatformAccount.js';
 import Submission from '../models/Submission.js';
 import CodeforcesService from './platforms/codeforcesService.js';
 import LeetCodeService from './platforms/leetcodeService.js';
+import HackerRankService from './platforms/hackerrankService.js';
 import {
   normalizeCodeforcesSubmission,
   normalizeLeetCodeSubmission,
+  normalizeHackerRankSubmission,
 } from '../utils/normalizer.js';
+
 
 export class SyncService {
   /**
@@ -57,15 +60,15 @@ export class SyncService {
    * Synchronize a Codeforces handle into DevTrack.
    * @param {string} handle - Codeforces username
    */
-  static async syncCodeforces(handle) {
-    const user = await this.getOrCreateDemoUser();
+  static async syncCodeforces(handle, userId = null) {
+    const targetUserId = userId || (await this.getOrCreateDemoUser())._id;
 
     // 1. Verify user on Codeforces
     const cfUser = await CodeforcesService.getUserInfo(handle);
 
     // 2. Link or update PlatformAccount in DB
     const account = await PlatformAccount.findOneAndUpdate(
-      { userId: user._id, platform: 'CODEFORCES' },
+      { userId: targetUserId, platform: 'CODEFORCES' },
       {
         username: cfUser.handle,
         syncStatus: 'SYNCING',
@@ -80,7 +83,7 @@ export class SyncService {
 
       // 4. Normalize submissions
       const normalizedSubs = rawSubmissions.map((sub) =>
-        normalizeCodeforcesSubmission(sub, user._id)
+        normalizeCodeforcesSubmission(sub, targetUserId)
       );
 
       // 5. Bulk Upsert into MongoDB to prevent duplicates
@@ -102,7 +105,7 @@ export class SyncService {
 
       // 6. Calculate total unique problems solved (ACCEPTED)
       const solvedProblems = await Submission.distinct('problemId', {
-        userId: user._id,
+        userId: targetUserId,
         platform: 'CODEFORCES',
         verdict: 'ACCEPTED',
       });
@@ -132,16 +135,17 @@ export class SyncService {
   /**
    * Synchronize a LeetCode handle into DevTrack.
    * @param {string} handle - LeetCode username
+   * @param {string|null} userId - Optional user ID
    */
-  static async syncLeetCode(handle) {
-    const user = await this.getOrCreateDemoUser();
+  static async syncLeetCode(handle, userId = null) {
+    const targetUserId = userId || (await this.getOrCreateDemoUser())._id;
 
     // 1. Verify user profile on LeetCode
     const lcUser = await LeetCodeService.getUserProfile(handle);
 
     // 2. Link or update PlatformAccount in DB
     const account = await PlatformAccount.findOneAndUpdate(
-      { userId: user._id, platform: 'LEETCODE' },
+      { userId: targetUserId, platform: 'LEETCODE' },
       {
         username: lcUser.username,
         syncStatus: 'SYNCING',
@@ -157,7 +161,7 @@ export class SyncService {
 
       // 4. Normalize submissions
       const normalizedSubs = rawSubmissions.map((sub) =>
-        normalizeLeetCodeSubmission(sub, user._id)
+        normalizeLeetCodeSubmission(sub, targetUserId)
       );
 
       // 5. Bulk Upsert into MongoDB to prevent duplicates
@@ -192,6 +196,86 @@ export class SyncService {
           medium: lcUser.mediumSolved,
           hard: lcUser.hardSolved,
         },
+        recentSubmissionsSynced: normalizedSubs.length,
+        lastSyncedAt: account.lastSyncedAt,
+      };
+    } catch (err) {
+      account.syncStatus = 'FAILED';
+      await account.save();
+      throw err;
+    }
+  }
+
+  /**
+   * Synchronize a HackerRank handle into DevTrack.
+   * @param {string} handle - HackerRank username
+   * @param {string|null} userId - Optional user ID
+   */
+  static async syncHackerRank(handle, userId = null) {
+    const targetUserId = userId || (await this.getOrCreateDemoUser())._id;
+
+    // 1. Fetch user profile, badges, scores, and recent challenges
+    const { profile, badges, scores, recentChallenges } = await HackerRankService.getUserFullData(handle);
+
+    const totalSolved = Array.isArray(badges)
+      ? badges.reduce((sum, b) => sum + (b.solved || 0), 0)
+      : 0;
+
+    const topScore = Array.isArray(scores)
+      ? scores.find((s) => s.slug === 'algorithms' || s.slug === 'data-structures' || s.slug === 'python')
+      : null;
+    const primaryRating = topScore?.practice?.score
+      ? Math.round(topScore.practice.score)
+      : (profile.level || null);
+
+    // 2. Link or update PlatformAccount in DB
+    const account = await PlatformAccount.findOneAndUpdate(
+      { userId: targetUserId, platform: 'HACKERRANK' },
+      {
+        username: profile.username,
+        syncStatus: 'SYNCING',
+        totalSolved,
+        rating: primaryRating,
+      },
+      { upsert: true, new: true }
+    );
+
+    try {
+      // 3. Normalize recent challenges into unified submissions
+      const normalizedSubs = recentChallenges.map((ch) =>
+        normalizeHackerRankSubmission(ch, targetUserId)
+      );
+
+      // 4. Bulk Upsert into MongoDB
+      if (normalizedSubs.length > 0) {
+        const bulkOperations = normalizedSubs.map((sub) => ({
+          updateOne: {
+            filter: {
+              platform: 'HACKERRANK',
+              platformSubmissionId: sub.platformSubmissionId,
+            },
+            update: { $set: sub },
+            upsert: true,
+          },
+        }));
+
+        await Submission.bulkWrite(bulkOperations);
+      }
+
+      // 5. Update PlatformAccount with success status
+      account.syncStatus = 'SUCCESS';
+      account.lastSyncedAt = new Date();
+      account.totalSolved = totalSolved;
+      account.rating = primaryRating;
+      await account.save();
+
+      return {
+        success: true,
+        handle: profile.username,
+        name: profile.name,
+        level: profile.level,
+        badgesCount: badges.length,
+        totalSolved,
         recentSubmissionsSynced: normalizedSubs.length,
         lastSyncedAt: account.lastSyncedAt,
       };

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireAuth } from '../middleware/authMiddleware.js';
 import {
   getMe,
   updateMe
@@ -6,7 +7,8 @@ import {
 
 const router = Router();
 
-router.get('/me', getMe);
-router.put('/me', updateMe);
+router.get('/me', requireAuth, getMe);
+router.put('/me', requireAuth, updateMe);
 
 export default router;
+
