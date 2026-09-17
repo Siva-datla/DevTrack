@@ -1,44 +1,310 @@
+import mongoose from 'mongoose';
+import Goal from '../models/Goal.js';
+import Submission from '../models/Submission.js';
+import PlatformAccount from '../models/PlatformAccount.js';
+import DashboardService from '../services/dashboardService.js';
+import SyncService from '../services/syncService.js';
+
 /**
- * Goals Controller
- * Handles user goal creation, tracking, updating, and deletion.
+ * Helper: Resolve user ID from request (auth token, query param, or demo user fallback).
  */
-
-export const getGoals = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Get user goals list template'
-  });
+const resolveUserId = async (req) => {
+  if (req.user?._id) return req.user._id;
+  if (req.user?.id) return req.user.id;
+  if (req.query?.userId && mongoose.Types.ObjectId.isValid(req.query.userId)) {
+    return req.query.userId;
+  }
+  const demoUser = await SyncService.getOrCreateDemoUser();
+  return demoUser?._id;
 };
 
-export const createGoal = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Create goal template'
-  });
+/**
+ * Helper: Evaluates and updates a goal's progress and status dynamically.
+ */
+export const evaluateGoalProgress = async (goal, userId) => {
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  let changed = false;
+
+  if (goal.type === 'SOLVE_PROBLEMS') {
+    const solvedCount = await Submission.distinct('problemId', {
+      userId: userObjectId,
+      verdict: 'ACCEPTED',
+    });
+    if (goal.currentValue !== solvedCount.length) {
+      goal.currentValue = solvedCount.length;
+      changed = true;
+    }
+  } else if (goal.type === 'STREAK') {
+    const stats = await DashboardService.getOverviewStats(userObjectId);
+    if (goal.currentValue !== stats.currentStreak) {
+      goal.currentValue = stats.currentStreak;
+      changed = true;
+    }
+  } else if (goal.type === 'RATING_TARGET') {
+    const accounts = await PlatformAccount.find({ userId: userObjectId });
+    const ratings = accounts.map((acc) => acc.rating).filter((r) => typeof r === 'number' && !isNaN(r));
+    const maxRating = ratings.length > 0 ? Math.max(...ratings) : 0;
+    if (goal.currentValue !== maxRating) {
+      goal.currentValue = maxRating;
+      changed = true;
+    }
+  }
+
+  // Update status based on current value and deadline
+  let newStatus = goal.status;
+  if (goal.currentValue >= goal.target) {
+    newStatus = 'COMPLETED';
+  } else if (new Date() > new Date(goal.deadline)) {
+    newStatus = 'FAILED';
+  } else {
+    newStatus = 'IN_PROGRESS';
+  }
+
+  if (goal.status !== newStatus) {
+    goal.status = newStatus;
+    changed = true;
+  }
+
+  if (changed) {
+    await goal.save();
+  }
+
+  return goal;
 };
 
-export const getGoalById = async (req, res) => {
-  const { id } = req.params;
-  res.status(200).json({
-    success: true,
-    message: `Get goal ${id} details template`
-  });
+/**
+ * GET /api/goals
+ * Fetch all goals for the user, with progress dynamically evaluated.
+ */
+export const getGoals = async (req, res, next) => {
+  try {
+    const userId = await resolveUserId(req);
+    const { status, type } = req.query;
+
+    const query = { userId };
+    if (status) query.status = status.toUpperCase();
+    if (type) query.type = type.toUpperCase();
+
+    const goals = await Goal.find(query).sort({ deadline: 1 });
+
+    // Evaluate progress dynamically for all active goals
+    const updatedGoals = await Promise.all(
+      goals.map(async (g) => {
+        try {
+          return await evaluateGoalProgress(g, userId);
+        } catch {
+          return g;
+        }
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      count: updatedGoals.length,
+      data: updatedGoals,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const updateGoal = async (req, res) => {
-  const { id } = req.params;
-  res.status(200).json({
-    success: true,
-    message: `Update goal ${id} template`
-  });
+/**
+ * POST /api/goals
+ * Create a new goal.
+ */
+export const createGoal = async (req, res, next) => {
+  try {
+    const userId = await resolveUserId(req);
+    const { title, type, target, deadline } = req.body;
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_TITLE', message: 'Goal title is required.' },
+      });
+    }
+
+    const validTypes = ['SOLVE_PROBLEMS', 'RATING_TARGET', 'TOPIC_MASTERY', 'STREAK'];
+    if (!type || !validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_TYPE',
+          message: `Goal type must be one of: ${validTypes.join(', ')}`,
+        },
+      });
+    }
+
+    const numericTarget = Number(target);
+    if (isNaN(numericTarget) || numericTarget <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_TARGET', message: 'Target must be a positive number.' },
+      });
+    }
+
+    const parsedDeadline = new Date(deadline);
+    if (isNaN(parsedDeadline.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_DEADLINE', message: 'A valid deadline date is required.' },
+      });
+    }
+
+    const goal = new Goal({
+      userId,
+      title: title.trim(),
+      type,
+      target: numericTarget,
+      deadline: parsedDeadline,
+      currentValue: 0,
+      status: 'IN_PROGRESS',
+    });
+
+    // Compute initial currentValue
+    await evaluateGoalProgress(goal, userId);
+    await goal.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Goal created successfully.',
+      data: goal,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const deleteGoal = async (req, res) => {
-  const { id } = req.params;
-  res.status(200).json({
-    success: true,
-    message: `Delete goal ${id} template`
-  });
+/**
+ * GET /api/goals/:id
+ * Retrieve a specific goal.
+ */
+export const getGoalById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid goal ID format.' },
+      });
+    }
+
+    const userId = await resolveUserId(req);
+    const goal = await Goal.findOne({ _id: id, userId });
+
+    if (!goal) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'GOAL_NOT_FOUND', message: 'Goal not found.' },
+      });
+    }
+
+    await evaluateGoalProgress(goal, userId);
+
+    res.status(200).json({
+      success: true,
+      data: goal,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /api/goals/:id
+ * Update an existing goal.
+ */
+export const updateGoal = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid goal ID format.' },
+      });
+    }
+
+    const userId = await resolveUserId(req);
+    const goal = await Goal.findOne({ _id: id, userId });
+
+    if (!goal) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'GOAL_NOT_FOUND', message: 'Goal not found.' },
+      });
+    }
+
+    const { title, target, deadline, status } = req.body;
+
+    if (title && title.trim()) goal.title = title.trim();
+    if (target !== undefined) {
+      const numTarget = Number(target);
+      if (isNaN(numTarget) || numTarget <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_TARGET', message: 'Target must be a positive number.' },
+        });
+      }
+      goal.target = numTarget;
+    }
+    if (deadline) {
+      const parsedDeadline = new Date(deadline);
+      if (isNaN(parsedDeadline.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_DEADLINE', message: 'A valid deadline date is required.' },
+        });
+      }
+      goal.deadline = parsedDeadline;
+    }
+    if (status && ['IN_PROGRESS', 'COMPLETED', 'FAILED'].includes(status.toUpperCase())) {
+      goal.status = status.toUpperCase();
+    }
+
+    await evaluateGoalProgress(goal, userId);
+    await goal.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Goal updated successfully.',
+      data: goal,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /api/goals/:id
+ * Delete a goal.
+ */
+export const deleteGoal = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid goal ID format.' },
+      });
+    }
+
+    const userId = await resolveUserId(req);
+    const result = await Goal.findOneAndDelete({ _id: id, userId });
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'GOAL_NOT_FOUND', message: 'Goal not found or unauthorized.' },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Goal deleted successfully.',
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export default {
@@ -46,5 +312,6 @@ export default {
   createGoal,
   getGoalById,
   updateGoal,
-  deleteGoal
+  deleteGoal,
+  evaluateGoalProgress,
 };

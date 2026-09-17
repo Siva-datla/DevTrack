@@ -17,6 +17,8 @@ router.get('/difficulty', getDifficulty);
 // 2. Specific User Dashboard (by handle or userId)
 router.get('/:identifier/stats', getStats);
 router.get('/:identifier/heatmap', getHeatmap);
+router.get('/:identifier/topics', getTopics);
 router.get('/:identifier/difficulty', getDifficulty);
 router.get('/:identifier', getStats);
+
 export default router;

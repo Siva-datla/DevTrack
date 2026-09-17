@@ -9,6 +9,13 @@ export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(uri);
     console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);
+
+    // Drop legacy submission index if it exists
+    try {
+      await mongoose.connection.collection('submissions').dropIndex('platform_1_platformSubmissionId_1');
+    } catch {
+      // Index already dropped or not present
+    }
   } catch (error) {
     console.error(`[MongoDB] Connection error: ${error.message}`);
     process.exit(1);

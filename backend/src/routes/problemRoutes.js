@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { optionalAuth } from '../middleware/authMiddleware.js';
 import {
   getProblems,
   getProblemById
@@ -6,7 +7,7 @@ import {
 
 const router = Router();
 
-router.get('/', getProblems);
-router.get('/:id', getProblemById);
+router.get('/', optionalAuth, getProblems);
+router.get('/:id', optionalAuth, getProblemById);
 
 export default router;

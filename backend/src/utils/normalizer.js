@@ -51,6 +51,7 @@ export const normalizeLeetCodeSubmission = (rawSub, userId = null) => {
     submittedAt: new Date(Number(rawSub.timestamp) * 1000),
     contestId: null,
     problemUrl: rawSub.titleSlug ? `https://leetcode.com/problems/${rawSub.titleSlug}/` : null,
+    tags: rawSub.tags || [],
   };
 };
 
@@ -155,19 +156,24 @@ export const normalizeLeetCodeContestRanking = (rawContest) => {
 export const normalizeHackerRankSubmission = (rawChallenge, userId = null) => {
   const slug = rawChallenge.ch_slug || rawChallenge.slug || 'unknown';
   const name = rawChallenge.name || slug;
+  const timestamp = rawChallenge.created_at ? new Date(rawChallenge.created_at).getTime() : Date.now();
+  const difficulty = rawChallenge.difficulty ? String(rawChallenge.difficulty).toUpperCase() : 'UNRATED';
 
   return {
     userId: userId || null,
     platform: 'HACKERRANK',
-    platformSubmissionId: String(slug),
+    platformSubmissionId: `${slug}_${timestamp}`,
     problemId: slug,
     problemName: name,
-    difficulty: 'UNRATED',
-    language: '',
+    difficulty,
+    language: rawChallenge.language || '',
     verdict: 'ACCEPTED',
     submittedAt: rawChallenge.created_at ? new Date(rawChallenge.created_at) : new Date(),
     contestId: rawChallenge.con_slug || null,
-    problemUrl: rawChallenge.url ? `https://www.hackerrank.com${rawChallenge.url}` : `https://www.hackerrank.com/challenges/${slug}`,
+    problemUrl: rawChallenge.url
+      ? (rawChallenge.url.startsWith('http') ? rawChallenge.url : `https://www.hackerrank.com${rawChallenge.url}`)
+      : `https://www.hackerrank.com/challenges/${slug}`,
+    tags: rawChallenge.tags || [],
   };
 };
 

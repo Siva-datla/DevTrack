@@ -50,7 +50,7 @@ const submissionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound unique index prevents duplicate submissions per platform
-submissionSchema.index({ platform: 1, platformSubmissionId: 1 }, { unique: true });
+// Compound unique index prevents duplicate submissions per user and platform
+submissionSchema.index({ userId: 1, platform: 1, platformSubmissionId: 1 }, { unique: true });
 
 export default mongoose.model('Submission', submissionSchema);

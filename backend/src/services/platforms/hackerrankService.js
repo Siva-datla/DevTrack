@@ -65,6 +65,48 @@ export class HackerRankService {
     return Array.isArray(data) ? data : (data.models || []);
   }
 
+  static challengeCache = new Map();
+
+  /**
+   * Fetch challenge details (difficulty and domain/track tags) by slug (cached).
+   * @param {string} slug - Challenge slug
+   */
+  static async getChallengeDetails(slug) {
+    if (!slug) return { difficulty: 'UNRATED', tags: [] };
+    if (this.challengeCache.has(slug)) {
+      return this.challengeCache.get(slug);
+    }
+
+    try {
+      const url = `${this.BASE_URL}/contests/master/challenges/${encodeURIComponent(slug)}`;
+      const response = await fetch(url, { headers: this.HEADERS });
+      if (!response.ok) {
+        return { difficulty: 'UNRATED', tags: [] };
+      }
+
+      const data = await response.json();
+      const model = data.model || {};
+      const diffRaw = model.difficulty_name || '';
+      const difficulty = diffRaw ? diffRaw.toUpperCase() : 'MEDIUM';
+
+      const tags = [];
+      if (model.track?.track_name) tags.push(model.track.track_name);
+      if (model.track?.name && model.track.name !== model.track.track_name) {
+        tags.push(model.track.name);
+      }
+
+      const details = {
+        name: model.name || slug,
+        difficulty,
+        tags,
+      };
+      this.challengeCache.set(slug, details);
+      return details;
+    } catch {
+      return { difficulty: 'UNRATED', tags: [] };
+    }
+  }
+
   /**
    * Fetch recent challenges completed by user.
    * @param {string} username - HackerRank username

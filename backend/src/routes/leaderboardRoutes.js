@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { optionalAuth } from '../middleware/authMiddleware.js';
 import {
-  getLeaderboard
+ getLeaderboard
 } from '../controllers/leaderboardController.js';
 
 const router = Router();
 
-router.get('/', getLeaderboard);
+router.get('/', optionalAuth, getLeaderboard);
 
 export default router;

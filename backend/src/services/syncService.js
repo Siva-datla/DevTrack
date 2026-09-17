@@ -2,6 +2,7 @@
 import User from '../models/User.js';
 import PlatformAccount from '../models/PlatformAccount.js';
 import Submission from '../models/Submission.js';
+import Problem from '../models/Problem.js';
 import CodeforcesService from './platforms/codeforcesService.js';
 import LeetCodeService from './platforms/leetcodeService.js';
 import HackerRankService from './platforms/hackerrankService.js';
@@ -9,8 +10,8 @@ import {
   normalizeCodeforcesSubmission,
   normalizeLeetCodeSubmission,
   normalizeHackerRankSubmission,
+  mapCodeforcesDifficulty,
 } from '../utils/normalizer.js';
-
 
 export class SyncService {
   /**
@@ -74,7 +75,7 @@ export class SyncService {
         syncStatus: 'SYNCING',
         rating: cfUser.rating || null,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     try {
@@ -86,12 +87,12 @@ export class SyncService {
         normalizeCodeforcesSubmission(sub, targetUserId)
       );
 
-      // 5. Bulk Upsert into MongoDB to prevent duplicates
-      // Matches on (platform + platformSubmissionId)
+      // 5. Bulk Upsert Submissions into MongoDB
       if (normalizedSubs.length > 0) {
         const bulkOperations = normalizedSubs.map((sub) => ({
           updateOne: {
             filter: {
+              userId: targetUserId,
               platform: 'CODEFORCES',
               platformSubmissionId: sub.platformSubmissionId,
             },
@@ -101,6 +102,40 @@ export class SyncService {
         }));
 
         await Submission.bulkWrite(bulkOperations);
+
+        // 5b. Upsert canonical Problem records
+        const problemOps = [];
+        const seenProblems = new Set();
+        for (const raw of rawSubmissions) {
+          const prob = raw.problem || {};
+          const contestId = prob.contestId || raw.contestId || null;
+          const index = prob.index || '';
+          const externalId = contestId && index ? `${contestId}${index}` : (index || 'UNKNOWN');
+
+          if (externalId !== 'UNKNOWN' && !seenProblems.has(externalId)) {
+            seenProblems.add(externalId);
+            problemOps.push({
+              updateOne: {
+                filter: { platform: 'CODEFORCES', externalId },
+                update: {
+                  $set: {
+                    platform: 'CODEFORCES',
+                    externalId,
+                    title: prob.name || `Problem ${externalId}`,
+                    difficulty: mapCodeforcesDifficulty(prob.rating),
+                    url: contestId && index ? `https://codeforces.com/contest/${contestId}/problem/${index}` : '',
+                    tags: prob.tags || [],
+                  },
+                },
+                upsert: true,
+              },
+            });
+          }
+        }
+
+        if (problemOps.length > 0) {
+          await Problem.bulkWrite(problemOps);
+        }
       }
 
       // 6. Calculate total unique problems solved (ACCEPTED)
@@ -132,6 +167,7 @@ export class SyncService {
       throw err;
     }
   }
+
   /**
    * Synchronize a LeetCode handle into DevTrack.
    * @param {string} handle - LeetCode username
@@ -152,7 +188,7 @@ export class SyncService {
         totalSolved: lcUser.totalSolved,
         rating: lcUser.ranking || null,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     try {
@@ -169,6 +205,7 @@ export class SyncService {
         const bulkOperations = normalizedSubs.map((sub) => ({
           updateOne: {
             filter: {
+              userId: targetUserId,
               platform: 'LEETCODE',
               platformSubmissionId: sub.platformSubmissionId,
             },
@@ -178,6 +215,35 @@ export class SyncService {
         }));
 
         await Submission.bulkWrite(bulkOperations);
+
+        // 5b. Upsert canonical Problem records
+        const problemOps = [];
+        const seenProblems = new Set();
+        for (const sub of normalizedSubs) {
+          if (sub.problemId && sub.problemId !== 'UNKNOWN' && !seenProblems.has(sub.problemId)) {
+            seenProblems.add(sub.problemId);
+            problemOps.push({
+              updateOne: {
+                filter: { platform: 'LEETCODE', externalId: sub.problemId },
+                update: {
+                  $set: {
+                    platform: 'LEETCODE',
+                    externalId: sub.problemId,
+                    title: sub.problemName,
+                    difficulty: sub.difficulty,
+                    url: `https://leetcode.com/problems/${sub.problemId}/`,
+                    tags: sub.tags || [],
+                  },
+                },
+                upsert: true,
+              },
+            });
+          }
+        }
+
+        if (problemOps.length > 0) {
+          await Problem.bulkWrite(problemOps);
+        }
       }
 
       // 6. Update PlatformAccount with success status
@@ -237,20 +303,35 @@ export class SyncService {
         totalSolved,
         rating: primaryRating,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     try {
-      // 3. Normalize recent challenges into unified submissions
-      const normalizedSubs = recentChallenges.map((ch) =>
+      // 3. Enrich recent challenges with details (difficulty & domain/track tags)
+      const enrichedChallenges = await Promise.all(
+        recentChallenges.map(async (ch) => {
+          const slug = ch.ch_slug || ch.slug || ch.challenge_id;
+          const details = await HackerRankService.getChallengeDetails(slug);
+          return {
+            ...ch,
+            name: details.name || ch.name || slug,
+            difficulty: details.difficulty,
+            tags: details.tags || [],
+          };
+        })
+      );
+
+      // 4. Normalize recent challenges into unified submissions
+      const normalizedSubs = enrichedChallenges.map((ch) =>
         normalizeHackerRankSubmission(ch, targetUserId)
       );
 
-      // 4. Bulk Upsert into MongoDB
+      // 5. Bulk Upsert into MongoDB
       if (normalizedSubs.length > 0) {
         const bulkOperations = normalizedSubs.map((sub) => ({
           updateOne: {
             filter: {
+              userId: targetUserId,
               platform: 'HACKERRANK',
               platformSubmissionId: sub.platformSubmissionId,
             },
@@ -260,6 +341,42 @@ export class SyncService {
         }));
 
         await Submission.bulkWrite(bulkOperations);
+
+        // 5b. Upsert canonical Problem records with real names, difficulty, and tags
+        const problemOps = [];
+        const seenProblems = new Set();
+        for (const ch of enrichedChallenges) {
+          const externalId = ch.ch_slug || ch.slug || ch.challenge_id || ch.name;
+          if (externalId && !seenProblems.has(externalId)) {
+            seenProblems.add(externalId);
+            const difficulty = ch.difficulty || 'MEDIUM';
+            const url = ch.url
+              ? (ch.url.startsWith('http') ? ch.url : `https://www.hackerrank.com${ch.url}`)
+              : `https://www.hackerrank.com/challenges/${externalId}`;
+            const tags = ch.tags || [];
+
+            problemOps.push({
+              updateOne: {
+                filter: { platform: 'HACKERRANK', externalId },
+                update: {
+                  $set: {
+                    platform: 'HACKERRANK',
+                    externalId,
+                    title: ch.name || externalId,
+                    difficulty,
+                    url,
+                    tags,
+                  },
+                },
+                upsert: true,
+              },
+            });
+          }
+        }
+
+        if (problemOps.length > 0) {
+          await Problem.bulkWrite(problemOps);
+        }
       }
 
       // 5. Update PlatformAccount with success status

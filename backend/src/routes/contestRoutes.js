@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { optionalAuth } from '../middleware/authMiddleware.js';
 import {
   getContests,
   getRatingHistory
@@ -6,7 +7,7 @@ import {
 
 const router = Router();
 
-router.get('/', getContests);
-router.get('/rating-history', getRatingHistory);
+router.get('/', optionalAuth, getContests);
+router.get('/rating-history', optionalAuth, getRatingHistory);
 
 export default router;

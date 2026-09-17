@@ -82,36 +82,50 @@ export class LeetCodeService {
     };
   }
 
-  static difficultyCache = new Map();
+  static questionCache = new Map();
 
   /**
-   * Fetch question difficulty by titleSlug (cached).
+   * Fetch question details (difficulty and topicTags) by titleSlug (cached).
    */
-  static async getQuestionDifficulty(titleSlug) {
-    if (!titleSlug) return 'UNRATED';
-    if (this.difficultyCache.has(titleSlug)) {
-      return this.difficultyCache.get(titleSlug);
+  static async getQuestionDetails(titleSlug) {
+    if (!titleSlug) return { difficulty: 'UNRATED', tags: [] };
+    if (this.questionCache.has(titleSlug)) {
+      return this.questionCache.get(titleSlug);
     }
 
     try {
       const query = `
-        query getQuestionDifficulty($titleSlug: String!) {
+        query getQuestionDetails($titleSlug: String!) {
           question(titleSlug: $titleSlug) {
             difficulty
+            topicTags {
+              name
+              slug
+            }
           }
         }
       `;
       const data = await this.sendGraphQL(query, { titleSlug });
       const difficulty = data?.question?.difficulty?.toUpperCase() || 'UNRATED';
-      this.difficultyCache.set(titleSlug, difficulty);
-      return difficulty;
+      const tags = (data?.question?.topicTags || []).map((t) => t.name);
+      const details = { difficulty, tags };
+      this.questionCache.set(titleSlug, details);
+      return details;
     } catch {
-      return 'UNRATED';
+      return { difficulty: 'UNRATED', tags: [] };
     }
   }
 
   /**
-   * Fetch recent Accepted (AC) submissions for a user with language and difficulty.
+   * Fetch question difficulty by titleSlug (cached).
+   */
+  static async getQuestionDifficulty(titleSlug) {
+    const details = await this.getQuestionDetails(titleSlug);
+    return details.difficulty;
+  }
+
+  /**
+   * Fetch recent Accepted (AC) submissions for a user with language, difficulty, and tags.
    * @param {string} username - LeetCode username
    * @param {number} limit - Number of submissions to fetch (up to 50)
    */
@@ -150,9 +164,9 @@ export class LeetCodeService {
       }
     }
 
-    // Resolve difficulty for unique problem slugs
+    // Resolve question details for unique problem slugs
     const uniqueSlugs = [...new Set(acList.map((s) => s.titleSlug).filter(Boolean))];
-    await Promise.all(uniqueSlugs.map((slug) => this.getQuestionDifficulty(slug)));
+    await Promise.all(uniqueSlugs.map((slug) => this.getQuestionDetails(slug)));
 
     return acList.map((sub) => {
       const lang =
@@ -161,12 +175,13 @@ export class LeetCodeService {
         langMap.get(`slug_${sub.titleSlug}`) ||
         '';
 
-      const difficulty = this.difficultyCache.get(sub.titleSlug) || 'UNRATED';
+      const details = this.questionCache.get(sub.titleSlug) || { difficulty: 'UNRATED', tags: [] };
 
       return {
         ...sub,
         lang,
-        difficulty,
+        difficulty: details.difficulty,
+        tags: details.tags,
       };
     });
   }

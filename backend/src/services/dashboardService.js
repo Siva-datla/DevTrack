@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Submission from '../models/Submission.js';
 import PlatformAccount from '../models/PlatformAccount.js';
+import Problem from '../models/Problem.js';
 import mongoose from 'mongoose';
 
 /**
@@ -70,7 +71,7 @@ export class DashboardService {
       if (user) return user._id;
     }
 
-    // 3. Check if it matches a connected platform handle (Codeforces / LeetCode)
+    // 3. Check if it matches a connected platform handle (Codeforces / LeetCode / HackerRank)
     const platformAccount = await PlatformAccount.findOne({
       username: { $regex: new RegExp(`^${identifier}$`, 'i') },
     });
@@ -171,6 +172,98 @@ export class DashboardService {
     ]);
 
     return heatmap;
+  }
+
+  /**
+   * Aggregates topic / tag mastery analysis across accepted submissions.
+   */
+  static async getTopicAnalytics(userId) {
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    // 1. Get unique solved problem IDs
+    const solvedProblemIds = await Submission.distinct('problemId', {
+      userId: userObjectId,
+      verdict: 'ACCEPTED',
+    });
+
+    if (solvedProblemIds.length === 0) {
+      return {
+        totalTopics: 0,
+        totalSolved: 0,
+        topics: [],
+        topTopics: [],
+      };
+    }
+
+    // 2. Fetch tags from canonical Problem collection
+    const problems = await Problem.find({
+      externalId: { $in: solvedProblemIds },
+    }).select('externalId tags difficulty platform').lean();
+
+    const topicCounts = new Map();
+
+    for (const prob of problems) {
+      const tags = (prob.tags && prob.tags.length > 0) ? prob.tags : ['General Practice'];
+      for (const tag of tags) {
+        const cleanTag = tag.trim().toLowerCase();
+        if (cleanTag) {
+          topicCounts.set(cleanTag, (topicCounts.get(cleanTag) || 0) + 1);
+        }
+      }
+    }
+
+    // If problems weren't tagged yet, add a baseline topic
+    if (topicCounts.size === 0) {
+      topicCounts.set('general problem solving', solvedProblemIds.length);
+    }
+
+    const ACRONYM_MAP = {
+      dp: 'Dynamic Programming',
+      dsu: 'Disjoint Set Union',
+      bit: 'Binary Indexed Tree',
+      fft: 'Fast Fourier Transform',
+      dfs: 'DFS',
+      bfs: 'BFS',
+      sql: 'SQL',
+    };
+
+    const formatTopicName = (name) => {
+      const lower = name.toLowerCase().trim();
+      if (ACRONYM_MAP[lower]) return ACRONYM_MAP[lower];
+      return name
+        .split(/[\s-]+/)
+        .map((word) => {
+          const wLower = word.toLowerCase();
+          if (ACRONYM_MAP[wLower]) return ACRONYM_MAP[wLower];
+          if (wLower === 'and' || wLower === 'or' || wLower === 'of') return wLower;
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+    };
+
+    const totalSolved = solvedProblemIds.length;
+    const sortedTopics = [...topicCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => {
+        const percentage = Math.round((count / totalSolved) * 100);
+        let masteryLevel = 'Beginner';
+        if (count >= 30) masteryLevel = 'Advanced';
+        else if (count >= 10) masteryLevel = 'Intermediate';
+
+        return {
+          topic: formatTopicName(name),
+          count,
+          percentage: Math.min(100, percentage),
+          masteryLevel,
+        };
+      });
+
+    return {
+      totalTopics: sortedTopics.length,
+      totalSolved,
+      topics: sortedTopics,
+      topTopics: sortedTopics.slice(0, 5),
+    };
   }
 }
 

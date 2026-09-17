@@ -3,7 +3,7 @@ import DashboardService from '../services/dashboardService.js';
 export const getStats = async (req, res, next) => {
   try {
     // Looks for /:identifier OR ?username=... OR req.user
-    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?.id;
+    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?._id || req.user?.id;
     const userId = await DashboardService.resolveUserId(identifier);
 
     if (!userId) {
@@ -26,7 +26,7 @@ export const getStats = async (req, res, next) => {
 
 export const getHeatmap = async (req, res, next) => {
   try {
-    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?.id;
+    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?._id || req.user?.id;
     const userId = await DashboardService.resolveUserId(identifier);
 
     if (!userId) {
@@ -47,16 +47,32 @@ export const getHeatmap = async (req, res, next) => {
   }
 };
 
-export const getTopics = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Topic analysis endpoint',
-  });
+export const getTopics = async (req, res, next) => {
+  try {
+    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?._id || req.user?.id;
+    const userId = await DashboardService.resolveUserId(identifier);
+
+    if (!userId) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: `No user found matching "${identifier || 'default'}"` },
+      });
+    }
+
+    const topicsData = await DashboardService.getTopicAnalytics(userId);
+
+    res.status(200).json({
+      success: true,
+      data: topicsData,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const getDifficulty = async (req, res, next) => {
   try {
-    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?.id;
+    const identifier = req.params.identifier || req.query.username || req.query.userId || req.user?._id || req.user?.id;
     const userId = await DashboardService.resolveUserId(identifier);
 
     if (!userId) {
