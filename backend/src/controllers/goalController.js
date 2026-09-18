@@ -26,12 +26,34 @@ export const evaluateGoalProgress = async (goal, userId) => {
   let changed = false;
 
   if (goal.type === 'SOLVE_PROBLEMS') {
-    const solvedCount = await Submission.distinct('problemId', {
-      userId: userObjectId,
-      verdict: 'ACCEPTED',
-    });
-    if (goal.currentValue !== solvedCount.length) {
-      goal.currentValue = solvedCount.length;
+    const platformAccounts = await PlatformAccount.find({ userId: userObjectId });
+
+    // Check if goal is scoped to a specific platform (via goal.platform or detected in title)
+    let targetPlatform = goal.platform && goal.platform !== 'ALL' ? goal.platform.toUpperCase() : null;
+    if (!targetPlatform && goal.title) {
+      const lower = goal.title.toLowerCase();
+      if (lower.includes('leetcode')) targetPlatform = 'LEETCODE';
+      else if (lower.includes('codeforces')) targetPlatform = 'CODEFORCES';
+      else if (lower.includes('hackerrank')) targetPlatform = 'HACKERRANK';
+    }
+
+    let officialSolved = 0;
+    if (targetPlatform) {
+      const acc = platformAccounts.find((a) => a.platform === targetPlatform);
+      officialSolved = acc?.totalSolved || 0;
+    } else {
+      officialSolved = platformAccounts.reduce((sum, acc) => sum + (acc.totalSolved || 0), 0);
+    }
+
+    // Also check raw submissions count as fallback or if higher
+    const subFilter = { userId: userObjectId, verdict: 'ACCEPTED' };
+    if (targetPlatform) subFilter.platform = targetPlatform;
+    const distinctSubs = await Submission.distinct('problemId', subFilter);
+
+    const evaluatedVal = Math.max(officialSolved, distinctSubs.length);
+
+    if (goal.currentValue !== evaluatedVal) {
+      goal.currentValue = evaluatedVal;
       changed = true;
     }
   } else if (goal.type === 'STREAK') {
@@ -42,7 +64,20 @@ export const evaluateGoalProgress = async (goal, userId) => {
     }
   } else if (goal.type === 'RATING_TARGET') {
     const accounts = await PlatformAccount.find({ userId: userObjectId });
-    const ratings = accounts.map((acc) => acc.rating).filter((r) => typeof r === 'number' && !isNaN(r));
+
+    let targetPlatform = goal.platform && goal.platform !== 'ALL' ? goal.platform.toUpperCase() : null;
+    if (!targetPlatform && goal.title) {
+      const lower = goal.title.toLowerCase();
+      if (lower.includes('leetcode')) targetPlatform = 'LEETCODE';
+      else if (lower.includes('codeforces')) targetPlatform = 'CODEFORCES';
+      else if (lower.includes('hackerrank')) targetPlatform = 'HACKERRANK';
+    }
+
+    const relevantAccounts = targetPlatform
+      ? accounts.filter((a) => a.platform === targetPlatform)
+      : accounts;
+
+    const ratings = relevantAccounts.map((acc) => acc.rating).filter((r) => typeof r === 'number' && !isNaN(r));
     const maxRating = ratings.length > 0 ? Math.max(...ratings) : 0;
     if (goal.currentValue !== maxRating) {
       goal.currentValue = maxRating;
@@ -54,9 +89,9 @@ export const evaluateGoalProgress = async (goal, userId) => {
   let newStatus = goal.status;
   if (goal.currentValue >= goal.target) {
     newStatus = 'COMPLETED';
-  } else if (new Date() > new Date(goal.deadline)) {
+  } else if (goal.status !== 'COMPLETED' && new Date() > new Date(goal.deadline)) {
     newStatus = 'FAILED';
-  } else {
+  } else if (goal.status !== 'COMPLETED') {
     newStatus = 'IN_PROGRESS';
   }
 
@@ -79,11 +114,12 @@ export const evaluateGoalProgress = async (goal, userId) => {
 export const getGoals = async (req, res, next) => {
   try {
     const userId = await resolveUserId(req);
-    const { status, type } = req.query;
+    const { status, type, platform } = req.query;
 
     const query = { userId };
     if (status) query.status = status.toUpperCase();
     if (type) query.type = type.toUpperCase();
+    if (platform && platform.toUpperCase() !== 'ALL') query.platform = platform.toUpperCase();
 
     const goals = await Goal.find(query).sort({ deadline: 1 });
 
@@ -115,7 +151,7 @@ export const getGoals = async (req, res, next) => {
 export const createGoal = async (req, res, next) => {
   try {
     const userId = await resolveUserId(req);
-    const { title, type, target, deadline } = req.body;
+    const { title, type, target, deadline, platform = 'ALL' } = req.body;
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({
@@ -155,6 +191,7 @@ export const createGoal = async (req, res, next) => {
       userId,
       title: title.trim(),
       type,
+      platform: platform ? platform.toUpperCase() : 'ALL',
       target: numericTarget,
       deadline: parsedDeadline,
       currentValue: 0,
@@ -234,9 +271,12 @@ export const updateGoal = async (req, res, next) => {
       });
     }
 
-    const { title, target, deadline, status } = req.body;
+    const { title, target, deadline, status, platform } = req.body;
 
     if (title && title.trim()) goal.title = title.trim();
+    if (platform && ['ALL', 'LEETCODE', 'CODEFORCES', 'HACKERRANK'].includes(platform.toUpperCase())) {
+      goal.platform = platform.toUpperCase();
+    }
     if (target !== undefined) {
       const numTarget = Number(target);
       if (isNaN(numTarget) || numTarget <= 0) {

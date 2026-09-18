@@ -138,8 +138,12 @@ export class DashboardService {
     const sortedDates = activeDatesAgg.map((d) => d._id);
     const { currentStreak, longestStreak } = calculateStreaks(sortedDates);
 
+    const platformTotal = platforms.reduce((sum, p) => sum + (p.totalSolved || 0), 0);
+    const effectiveTotalSolved = Math.max(platformTotal, uniqueSolved.length);
+
     return {
-      totalSolved: uniqueSolved.length,
+      totalSolved: effectiveTotalSolved,
+      uniqueSolved: uniqueSolved.length,
       currentStreak,
       longestStreak,
       platforms,

@@ -69,7 +69,7 @@ export const SubmissionDetailModal = ({ submissionId, initialData, isOpen, onClo
   const [submission, setSubmission] = useState(initialData || null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     if (initialData) {

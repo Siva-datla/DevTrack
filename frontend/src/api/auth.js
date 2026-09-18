@@ -30,6 +30,11 @@ export const authApi = {
     const response = await api.put('/users/me', userData);
     return response.data;
   },
+
+  exportData: async () => {
+    const response = await api.get('/users/me/export', { responseType: 'blob' });
+    return response;
+  },
 };
 
 export default authApi;

@@ -11,6 +11,7 @@ import {
   Sparkles,
   Info,
 } from 'lucide-react';
+import { PlatformIcon } from '../components/common/PlatformIcon';
 
 export const PlatformsPage = () => {
   const [platforms, setPlatforms] = useState([]);
@@ -180,13 +181,14 @@ export const PlatformsPage = () => {
             return (
               <span
                 key={p}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
                   isConn
                     ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                {p}
+                <PlatformIcon platform={p} className="w-3 h-3" />
+                <span>{p}</span>
               </span>
             );
           })}
@@ -212,35 +214,7 @@ export const PlatformsPage = () => {
       </div>
 
       {/* How Synchronization Works Guide Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#0f172a]/90 border border-slate-200 dark:border-slate-800/80 shadow-sm text-xs space-y-3">
-        <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
-          <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          <span>How Synchronization Works</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-slate-500 dark:text-slate-400 text-xs">
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
-              1. Direct API Ingestion
-            </span>
-            Submissions, problem metadata, and contest ratings are fetched directly through official platform APIs and GraphQL interfaces.
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
-              2. Normalization & Deduplication
-            </span>
-            Raw payloads are canonicalized into standard verdicts (Accepted, Wrong Answer, TLE), and distinct problem IDs prevent double counting.
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
-              3. Dynamic Metric Updates
-            </span>
-            Your streaks, 365-day submission heatmap, difficulty percentages, and active goals are recalculated on every sync.
-          </div>
-        </div>
-      </div>
+      
 
       {/* Connect Account Modal */}
       <LinkAccountModal

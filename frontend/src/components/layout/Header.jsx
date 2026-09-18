@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { Menu, Shield, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
@@ -24,6 +24,8 @@ export const Header = ({ onOpenSidebar, isCollapsed, onToggleCollapse }) => {
         return { title: 'Goals & Targets', desc: 'Track streaks, problem counts, and target ratings' };
       case '/leaderboard':
         return { title: 'Global Leaderboard', desc: 'Developer rankings based on solved counts and streaks' };
+      case '/settings':
+        return { title: 'Account Settings', desc: 'Manage your profile, security credentials, and data exports' };
       case '/admin':
         return { title: 'Admin Console', desc: 'System management, platform health, and user administration' };
       default:
@@ -83,11 +85,15 @@ export const Header = ({ onOpenSidebar, isCollapsed, onToggleCollapse }) => {
         {/* Theme Toggle Button */}
         <ThemeToggle />
 
-        {/* User avatar indicator */}
+        {/* User avatar indicator (links to /settings) */}
         <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+          <Link
+            to="/settings"
+            title="Account Settings & Profile"
+            className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold text-xs flex items-center justify-center shadow-sm hover:scale-105 hover:ring-2 hover:ring-indigo-500/40 transition-all cursor-pointer"
+          >
             {user?.name ? user.name[0].toUpperCase() : 'U'}
-          </div>
+          </Link>
         </div>
       </div>
     </header>

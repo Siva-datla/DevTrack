@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, CheckCircle2, Clock, AlertTriangle, Link2, Sparkles } from 'lucide-react';
+import { PlatformIcon } from '../common/PlatformIcon';
 
 const platformMeta = {
   LEETCODE: {
@@ -64,10 +65,7 @@ export const PlatformSnapshots = ({ platforms = [] }) => {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: meta.color }}
-                    />
+                    <PlatformIcon platform={pKey} className="w-4 h-4" />
                     <span className="font-bold text-sm text-slate-900 dark:text-white">
                       {meta.name}
                     </span>

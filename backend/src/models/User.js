@@ -25,6 +25,36 @@ const userSchema = new mongoose.Schema(
       enum: ['USER', 'ADMIN'],
       default: 'USER',
     },
+    bio: {
+      type: String,
+      maxlength: [250, 'Bio cannot exceed 250 characters'],
+      trim: true,
+      default: '',
+    },
+    avatar: {
+      type: String,
+      default: 'avatar-1',
+    },
+    website: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    githubHandle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    linkedinHandle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    preferredPlatform: {
+      type: String,
+      enum: ['ALL', 'LEETCODE', 'CODEFORCES', 'HACKERRANK'],
+      default: 'ALL',
+    },
   },
   { timestamps: true }
 );

@@ -20,6 +20,7 @@ import ContestsPage from './pages/ContestsPage';
 import GoalsPage from './pages/GoalsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
+import SettingsPage from './pages/SettingsPage';
 
 const RootRedirect = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -50,6 +51,7 @@ export const App = () => {
                   <Route path="/contests" element={<ContestsPage />} />
                   <Route path="/goals" element={<GoalsPage />} />
                   <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
 
                   {/* Admin-only route */}
                   <Route

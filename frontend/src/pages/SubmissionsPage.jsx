@@ -99,7 +99,7 @@ const diffColors = {
 };
 
 export const SubmissionsPage = () => {
-  const { toast } = useToast();
+  const toast = useToast();
 
   const [submissions, setSubmissions] = useState([]);
   const [stats, setStats] = useState({

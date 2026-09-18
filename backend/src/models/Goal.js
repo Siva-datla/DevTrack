@@ -18,6 +18,11 @@ const goalSchema = new mongoose.Schema(
       enum: ['SOLVE_PROBLEMS', 'RATING_TARGET', 'TOPIC_MASTERY', 'STREAK'],
       required: true,
     },
+    platform: {
+      type: String,
+      enum: ['ALL', 'LEETCODE', 'CODEFORCES', 'HACKERRANK'],
+      default: 'ALL',
+    },
     target: {
       type: Number,
       required: true,

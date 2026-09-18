@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { CheckCircle2, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -30,17 +30,21 @@ export const ToastProvider = ({ children }) => {
     [removeToast]
   );
 
-  const toast = {
-    success: (message, title = 'Success') =>
-      addToast({ type: 'success', title, message }),
-    error: (message, title = 'Error') =>
-      addToast({ type: 'error', title, message: message || 'An unexpected error occurred.' }),
-    info: (message, title = 'Notice') =>
-      addToast({ type: 'info', title, message }),
-    warning: (message, title = 'Warning') =>
-      addToast({ type: 'warning', title, message }),
-    dismiss: (id) => removeToast(id),
-  };
+  const toast = useMemo(() => {
+    const t = {
+      success: (message, title = 'Success') =>
+        addToast({ type: 'success', title, message }),
+      error: (message, title = 'Error') =>
+        addToast({ type: 'error', title, message: message || 'An unexpected error occurred.' }),
+      info: (message, title = 'Notice') =>
+        addToast({ type: 'info', title, message }),
+      warning: (message, title = 'Warning') =>
+        addToast({ type: 'warning', title, message }),
+      dismiss: (id) => removeToast(id),
+    };
+    t.toast = t; // Supports both `const toast = useToast()` and `const { toast } = useToast()`
+    return t;
+  }, [addToast, removeToast]);
 
   return (
     <ToastContext.Provider value={toast}>

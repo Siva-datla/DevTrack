@@ -11,6 +11,7 @@ import {
   Code2,
   Plus,
 } from 'lucide-react';
+import { PlatformIcon } from '../common/PlatformIcon';
 
 const platformStyles = {
   LEETCODE: {
@@ -73,13 +74,10 @@ export const PlatformCard = ({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-sm"
-              style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center p-2.5 shadow-sm border border-slate-200/60 dark:border-slate-800"
+              style={{ backgroundColor: `${meta.color}15` }}
             >
-              <span
-                className="w-3.5 h-3.5 rounded-full"
-                style={{ backgroundColor: meta.color }}
-              />
+              <PlatformIcon platform={platformKey} className="w-6 h-6" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">

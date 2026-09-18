@@ -15,6 +15,7 @@ import {
   X,
   ChevronRight,
   PanelLeftClose,
+  Settings,
 } from 'lucide-react';
 
 export const Sidebar = ({
@@ -34,6 +35,7 @@ export const Sidebar = ({
     { name: 'Contests & Rating', path: '/contests', icon: Trophy },
     { name: 'Goals', path: '/goals', icon: Target },
     { name: 'Leaderboard', path: '/leaderboard', icon: Medal },
+    { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
   if (isAdmin) {
@@ -175,22 +177,25 @@ export const Sidebar = ({
 
           {/* User Card at bottom */}
           <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40">
-            <div className="flex items-center h-12 px-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
+            <div className="flex items-center h-12 px-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-800/80 transition-colors">
               {/* User Avatar */}
               <div
-                title={`${user?.name || 'Developer'} (${user?.role || 'USER'})`}
-                className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer"
+                onClick={() => navigate('/settings')}
+                title="Account Settings"
+                className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
               >
                 {user?.name ? user.name.slice(0, 2).toUpperCase() : 'DV'}
               </div>
 
               {/* User Details */}
               <div
-                className={`ml-2.5 min-w-0 flex-1 whitespace-nowrap transition-opacity duration-150 ${
+                onClick={() => navigate('/settings')}
+                className={`ml-2.5 min-w-0 flex-1 whitespace-nowrap transition-opacity duration-150 cursor-pointer ${
                   isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
                 }`}
+                title="View Settings & Profile"
               >
-                <div className="text-xs font-semibold truncate text-slate-800 dark:text-slate-200">
+                <div className="text-xs font-semibold truncate text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                   {user?.name || 'Developer'}
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">

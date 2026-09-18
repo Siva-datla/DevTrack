@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import User from '../models/User.js';
 import PlatformAccount from '../models/PlatformAccount.js';
+import Submission from '../models/Submission.js';
+import Goal from '../models/Goal.js';
+import ContestService from '../services/contestService.js';
 
 /**
  * Get current authenticated user profile and connected platforms
@@ -30,7 +33,17 @@ export const getMe = async (req, res, next) => {
  */
 export const updateMe = async (req, res, next) => {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const {
+      name,
+      bio,
+      avatar,
+      website,
+      githubHandle,
+      linkedinHandle,
+      preferredPlatform,
+      currentPassword,
+      newPassword,
+    } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -40,8 +53,17 @@ export const updateMe = async (req, res, next) => {
       });
     }
 
-    if (name && name.trim()) {
-      user.name = name.trim();
+    if (name && name.trim()) user.name = name.trim();
+    if (bio !== undefined) user.bio = String(bio).trim();
+    if (avatar !== undefined) user.avatar = String(avatar).trim();
+    if (website !== undefined) user.website = String(website).trim();
+    if (githubHandle !== undefined) user.githubHandle = String(githubHandle).trim();
+    if (linkedinHandle !== undefined) user.linkedinHandle = String(linkedinHandle).trim();
+    if (
+      preferredPlatform &&
+      ['ALL', 'LEETCODE', 'CODEFORCES', 'HACKERRANK'].includes(preferredPlatform.toUpperCase())
+    ) {
+      user.preferredPlatform = preferredPlatform.toUpperCase();
     }
 
     if (newPassword) {
@@ -87,9 +109,17 @@ export const updateMe = async (req, res, next) => {
       data: {
         user: {
           id: user._id,
+          _id: user._id,
           name: user.name,
           email: user.email,
           role: user.role,
+          bio: user.bio,
+          avatar: user.avatar,
+          website: user.website,
+          githubHandle: user.githubHandle,
+          linkedinHandle: user.linkedinHandle,
+          preferredPlatform: user.preferredPlatform,
+          createdAt: user.createdAt,
           updatedAt: user.updatedAt,
         },
       },
@@ -99,7 +129,89 @@ export const updateMe = async (req, res, next) => {
   }
 };
 
+/**
+ * Export complete developer data as JSON
+ * GET /api/users/me/export
+ */
+export const exportUserData = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found.' },
+      });
+    }
+
+    const [platforms, submissions, goals, contestHistory] = await Promise.all([
+      PlatformAccount.find({ userId }).select('-__v'),
+      Submission.find({ userId }).select('-__v').sort({ submittedAt: -1 }),
+      Goal.find({ userId }).select('-__v').sort({ createdAt: -1 }),
+      ContestService.getRatingHistory(userId).catch(() => null),
+    ]);
+
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        bio: user.bio || '',
+        avatar: user.avatar || '',
+        website: user.website || '',
+        githubHandle: user.githubHandle || '',
+        linkedinHandle: user.linkedinHandle || '',
+        preferredPlatform: user.preferredPlatform || 'ALL',
+        createdAt: user.createdAt,
+      },
+      platforms: platforms.map((p) => ({
+        platform: p.platform,
+        username: p.username,
+        rating: p.rating,
+        totalSolved: p.totalSolved,
+        syncStatus: p.syncStatus,
+        lastSyncedAt: p.lastSyncedAt,
+      })),
+      goals: goals.map((g) => ({
+        title: g.title,
+        type: g.type,
+        platform: g.platform,
+        target: g.target,
+        currentValue: g.currentValue,
+        deadline: g.deadline,
+        status: g.status,
+        createdAt: g.createdAt,
+      })),
+      contests: contestHistory?.history || [],
+      submissionsCount: submissions.length,
+      submissions: submissions.map((s) => ({
+        platform: s.platform,
+        problemId: s.problemId,
+        title: s.title,
+        verdict: s.verdict,
+        language: s.language,
+        submittedAt: s.submittedAt,
+        runtime: s.runtime,
+        memory: s.memory,
+      })),
+    };
+
+    const safeName = (user.name || 'developer').toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const filename = `devtrack-export-${safeName}-${new Date().toISOString().slice(0, 10)}.json`;
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(JSON.stringify(exportPayload, null, 2));
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   getMe,
   updateMe,
+  exportUserData,
 };

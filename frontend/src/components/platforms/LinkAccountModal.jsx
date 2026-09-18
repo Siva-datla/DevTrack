@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, AlertCircle, CheckCircle2, Link2, Info } from 'lucide-react';
 import platformsApi from '../../api/platforms';
+import { PlatformIcon } from '../common/PlatformIcon';
 
 const platformDetails = {
   LEETCODE: {
@@ -99,10 +100,10 @@ export const LinkAccountModal = ({
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm font-bold text-sm"
-              style={{ backgroundColor: `${currentMeta.color}15`, color: currentMeta.color }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center p-2 shadow-sm border border-slate-200/60 dark:border-slate-800"
+              style={{ backgroundColor: `${currentMeta.color}15` }}
             >
-              <Link2 className="w-4 h-4" />
+              <PlatformIcon platform={platform} className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -172,10 +173,7 @@ export const LinkAccountModal = ({
                     }`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: p.color }}
-                      />
+                      <PlatformIcon platform={key} className="w-3.5 h-3.5 flex-shrink-0" />
                       <span className="truncate">{p.name}</span>
                     </div>
 
