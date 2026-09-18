@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Loader2, AlertCircle, CheckCircle2, Link2, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2, AlertCircle, CheckCircle2, Link2, Info } from 'lucide-react';
 import platformsApi from '../../api/platforms';
 
 const platformDetails = {
@@ -33,6 +33,7 @@ export const LinkAccountModal = ({
   isOpen,
   onClose,
   initialPlatform = 'LEETCODE',
+  connectedAccounts = [],
   onSuccess,
 }) => {
   const [platform, setPlatform] = useState(initialPlatform);
@@ -40,9 +41,23 @@ export const LinkAccountModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Crucial fix: update selected platform and reset fields whenever modal opens or initialPlatform changes
+  useEffect(() => {
+    if (isOpen) {
+      setPlatform(initialPlatform);
+      setUsername('');
+      setError('');
+    }
+  }, [isOpen, initialPlatform]);
+
   if (!isOpen) return null;
 
   const currentMeta = platformDetails[platform] || platformDetails.LEETCODE;
+
+  // Check if the currently selected platform is already connected
+  const existingAccount = connectedAccounts.find(
+    (a) => a.platform?.toUpperCase() === platform?.toUpperCase()
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,12 +98,15 @@ export const LinkAccountModal = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900/50">
-              <Link2 className="w-5 h-5" />
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm font-bold text-sm"
+              style={{ backgroundColor: `${currentMeta.color}15`, color: currentMeta.color }}
+            >
+              <Link2 className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Connect Coding Platform
+                Connect {currentMeta.name}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Link your handle to import submissions and ratings
@@ -114,16 +132,31 @@ export const LinkAccountModal = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {/* Platform Selector Buttons */}
+        {/* Existing Connection Warning */}
+        {existingAccount && (
+          <div className="mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <span>
+              <strong>{currentMeta.name}</strong> is currently linked to{' '}
+              <span className="font-mono font-semibold">@{existingAccount.username}</span>. Entering a new handle will update your linked account.
+            </span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {/* Platform Selector Tabs */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               Select Platform
             </label>
             <div className="grid grid-cols-3 gap-2">
               {Object.keys(platformDetails).map((key) => {
                 const p = platformDetails[key];
                 const isSelected = platform === key;
+                const isConnected = connectedAccounts.some(
+                  (a) => a.platform?.toUpperCase() === key
+                );
+
                 return (
                   <button
                     key={key}
@@ -132,17 +165,26 @@ export const LinkAccountModal = ({
                       setPlatform(key);
                       setError('');
                     }}
-                    className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                        ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/30'
                         : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80'
                     }`}
                   >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: p.color }}
-                    />
-                    <span>{p.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </div>
+
+                    {isConnected && (
+                      <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        <span>Linked</span>
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -152,7 +194,7 @@ export const LinkAccountModal = ({
           {/* Username / Handle input */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              {currentMeta.name} Handle or Username
+              {currentMeta.name} Username or Handle
             </label>
             <input
               type="text"
@@ -160,6 +202,7 @@ export const LinkAccountModal = ({
               onChange={(e) => setUsername(e.target.value)}
               placeholder={currentMeta.placeholder}
               required
+              autoFocus
               disabled={submitting}
               className="w-full px-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
@@ -169,7 +212,7 @@ export const LinkAccountModal = ({
           </div>
 
           {/* Buttons */}
-          <div className="pt-3 flex items-center justify-end gap-2.5">
+          <div className="pt-2 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
@@ -190,9 +233,7 @@ export const LinkAccountModal = ({
                   <span>Verifying & Syncing...</span>
                 </>
               ) : (
-                <>
-                  <span>Connect & Sync</span>
-                </>
+                <span>{existingAccount ? 'Update & Sync' : 'Connect & Sync'}</span>
               )}
             </button>
           </div>

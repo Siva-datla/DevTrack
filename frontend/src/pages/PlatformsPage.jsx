@@ -114,8 +114,15 @@ export const PlatformsPage = () => {
     }
   };
 
-  const openConnectModal = (platformKey = 'LEETCODE') => {
-    setSelectedPlatformForModal(platformKey);
+  const openConnectModal = (platformKey) => {
+    let keyToSelect = platformKey;
+    if (!keyToSelect) {
+      const unlinked = ['LEETCODE', 'CODEFORCES', 'HACKERRANK'].find(
+        (p) => !platforms.some((acc) => acc.platform?.toUpperCase() === p)
+      );
+      keyToSelect = unlinked || 'LEETCODE';
+    }
+    setSelectedPlatformForModal(keyToSelect);
     setLinkModalOpen(true);
   };
 
@@ -287,6 +294,7 @@ export const PlatformsPage = () => {
         isOpen={linkModalOpen}
         onClose={() => setLinkModalOpen(false)}
         initialPlatform={selectedPlatformForModal}
+        connectedAccounts={platforms}
         onSuccess={(msg) => {
           setBanner({ type: 'success', text: msg });
           loadPlatforms();
