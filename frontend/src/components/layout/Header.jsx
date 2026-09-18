@@ -1,10 +1,10 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Menu, Terminal, Shield, Sparkles } from 'lucide-react';
+import { Menu, Shield, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 
-export const Header = ({ onOpenSidebar }) => {
+export const Header = ({ onOpenSidebar, isCollapsed, onToggleCollapse }) => {
   const { user, isAdmin } = useAuth();
   const location = useLocation();
 
@@ -35,14 +35,29 @@ export const Header = ({ onOpenSidebar }) => {
 
   return (
     <header className="h-16 px-4 sm:px-6 bg-white/80 dark:bg-[#0c121e]/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 sticky top-0 z-30 flex items-center justify-between transition-colors">
-      {/* Left side: Hamburger button + Page Title */}
+      {/* Left side: Hamburger button (mobile) / Collapse button (desktop) + Page Title */}
       <div className="flex items-center gap-3">
+        {/* Mobile Hamburger */}
         <button
           onClick={onOpenSidebar}
           className="p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
           aria-label="Open sidebar"
         >
           <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Desktop Collapse / Expand Toggle */}
+        <button
+          onClick={onToggleCollapse}
+          className="hidden lg:flex p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {isCollapsed ? (
+            <PanelLeft className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          ) : (
+            <PanelLeftClose className="w-5 h-5" />
+          )}
         </button>
 
         <div>
