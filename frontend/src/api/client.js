@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://devtrackx-backend.vercel.app/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -78,7 +78,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken });
+        const { data } = await axios.post(`${API_BASE_URL.replace(/\/+$/, '')}/auth/refresh-token`, { refreshToken });
         const newAccessToken = data.data.tokens.accessToken;
         const newRefreshToken = data.data.tokens.refreshToken;
 
