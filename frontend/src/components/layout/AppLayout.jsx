@@ -6,7 +6,6 @@ import Header from './Header';
 export const AppLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Default to open (false), or restore saved user preference
     return localStorage.getItem('devtrack_sidebar_collapsed') === 'true';
   });
 
@@ -20,7 +19,7 @@ export const AppLayout = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex transition-colors duration-200">
-      {/* Sidebar (handles both desktop collapsed/expanded and mobile drawer) */}
+      {/* Sidebar */}
       <Sidebar
         isMobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
@@ -28,10 +27,10 @@ export const AppLayout = () => {
         onToggleCollapse={toggleCollapse}
       />
 
-      {/* Main Content Area: dynamic padding based on collapsed state */}
+      {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col min-w-0 will-change-[padding-left] transition-[padding-left] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        className={`flex-1 flex flex-col min-w-0 transition-[padding-left] duration-200 ease-out ${
+          isCollapsed ? 'lg:pl-[72px]' : 'lg:pl-64'
         }`}
       >
         <Header
