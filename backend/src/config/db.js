@@ -4,10 +4,25 @@ import mongoose from 'mongoose';
  * Connects to MongoDB database with connection event listeners
  */
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI;
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+  if (mongoose.connection.readyState === 2) {
+    return new Promise((resolve, reject) => {
+      mongoose.connection.once('connected', () => resolve(mongoose.connection));
+      mongoose.connection.once('error', reject);
+    });
+  }
+
+  const uri =
+    process.env.MONGODB_URI ||
+    'mongodb+srv://sivadatla4545_db_user:U6KXhSq89sJCGew8@cluster0.lybh1al.mongodb.net/devtrack';
+
 
   try {
-    const conn = await mongoose.connect(uri);
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 15000,
+    });
     console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);
 
     // Drop legacy submission index if it exists
@@ -16,9 +31,11 @@ export const connectDB = async () => {
     } catch {
       // Index already dropped or not present
     }
+
+    return conn;
   } catch (error) {
     console.error(`[MongoDB] Connection error: ${error.message}`);
-    process.exit(1);
+    throw error;
   }
 };
 
