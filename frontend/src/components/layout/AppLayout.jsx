@@ -30,7 +30,7 @@ export const AppLayout = () => {
 
       {/* Main Content Area: dynamic padding based on collapsed state */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ${
+        className={`flex-1 flex flex-col min-w-0 will-change-[padding-left] transition-[padding-left] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
           isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
         }`}
       >

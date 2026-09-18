@@ -39,6 +39,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    // console.log(originalRequest)
 
     // Avoid retry on login, register, or refresh-token itself
     if (
@@ -46,6 +47,7 @@ api.interceptors.response.use(
       originalRequest?.url?.includes('/auth/register') ||
       originalRequest?.url?.includes('/auth/refresh-token')
     ) {
+
       return Promise.reject(error);
     }
 

@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 /**
  * Service for communicating with LeetCode's public GraphQL API.
  */
@@ -13,23 +15,28 @@ export class LeetCodeService {
       payload.operationName = operationName;
     }
 
-    const response = await fetch(this.GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Referer': 'https://leetcode.com',
-        'User-Agent': 'DevTrack-Agent/1.0',
-      },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await axios.post(this.GRAPHQL_URL, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          Referer: 'https://leetcode.com',
+          'User-Agent': 'DevTrack-Agent/1.0',
+        },
+      });
 
-    const data = await response.json();
+      const data = response.data;
 
-    if (data.errors) {
-      throw new Error(data.errors[0]?.message || 'LeetCode GraphQL error');
+      if (data.errors) {
+        throw new Error(data.errors[0]?.message || 'LeetCode GraphQL error');
+      }
+
+      return data.data;
+    } catch (error) {
+      if (error.response?.data?.errors) {
+        throw new Error(error.response.data.errors[0]?.message || 'LeetCode GraphQL error');
+      }
+      throw error;
     }
-
-    return data.data;
   }
 
   /**
