@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import dashboardApi from '../api/dashboard';
 import submissionsApi from '../api/submissions';
 import StatCard from '../components/dashboard/StatCard';
@@ -21,6 +22,7 @@ import { Link } from 'react-router-dom';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
+  const toast = useToast();
 
   const [stats, setStats] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
@@ -55,14 +57,21 @@ export const DashboardPage = () => {
       if (subStatsRes.status === 'fulfilled' && subStatsRes.value?.success) {
         setSubStats(subStatsRes.value.data);
       }
+
+      if (isSilent) {
+        toast.success('Dashboard metrics updated!');
+      }
     } catch (err) {
       console.error('[DashboardPage] Error fetching dashboard data:', err);
       setError('Failed to load some dashboard metrics. Please refresh.');
+      if (isSilent) {
+        toast.error('Failed to update metrics. Please try again.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchDashboardData();

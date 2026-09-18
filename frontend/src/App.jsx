@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { GuestRoute } from './components/common/GuestRoute';
 import AppLayout from './components/layout/AppLayout';
@@ -30,42 +31,44 @@ export const App = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Guest-only routes (redirects to /dashboard if logged in) */}
-            <Route element={<GuestRoute />}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-            </Route>
-
-            {/* Protected routes wrapped in AppLayout */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/platforms" element={<PlatformsPage />} />
-                <Route path="/problems" element={<ProblemsPage />} />
-                <Route path="/submissions" element={<SubmissionsPage />} />
-                <Route path="/contests" element={<ContestsPage />} />
-                <Route path="/goals" element={<GoalsPage />} />
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
-
-                {/* Admin-only route */}
-                <Route
-                  path="/admin"
-                  element={
-                    <ProtectedRoute requireAdmin={true}>
-                      <AdminPage />
-                    </ProtectedRoute>
-                  }
-                />
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Guest-only routes (redirects to /dashboard if logged in) */}
+              <Route element={<GuestRoute />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
               </Route>
-            </Route>
 
-            {/* Default root navigation */}
-            <Route path="/" element={<RootRedirect />} />
-            <Route path="*" element={<RootRedirect />} />
-          </Routes>
-        </BrowserRouter>
+              {/* Protected routes wrapped in AppLayout */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/platforms" element={<PlatformsPage />} />
+                  <Route path="/problems" element={<ProblemsPage />} />
+                  <Route path="/submissions" element={<SubmissionsPage />} />
+                  <Route path="/contests" element={<ContestsPage />} />
+                  <Route path="/goals" element={<GoalsPage />} />
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+
+                  {/* Admin-only route */}
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute requireAdmin={true}>
+                        <AdminPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+              </Route>
+
+              {/* Default root navigation */}
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="*" element={<RootRedirect />} />
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
       </AuthProvider>
     </ThemeProvider>
   );

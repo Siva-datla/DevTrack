@@ -3,12 +3,11 @@ import platformsApi from '../api/platforms';
 import PlatformCard from '../components/platforms/PlatformCard';
 import LinkAccountModal from '../components/platforms/LinkAccountModal';
 import UnlinkModal from '../components/platforms/UnlinkModal';
+import { useToast } from '../context/ToastContext';
 import {
   Link2,
   RefreshCw,
   Plus,
-  CheckCircle2,
-  AlertCircle,
   Sparkles,
   Info,
 } from 'lucide-react';
@@ -19,8 +18,7 @@ export const PlatformsPage = () => {
   const [syncingMap, setSyncingMap] = useState({});
   const [isSyncingAll, setIsSyncingAll] = useState(false);
 
-  // Notifications
-  const [banner, setBanner] = useState(null); // { type: 'success' | 'error', text: '' }
+  const toast = useToast();
 
   // Modal States
   const [linkModalOpen, setLinkModalOpen] = useState(false);
@@ -42,14 +40,11 @@ export const PlatformsPage = () => {
       }
     } catch (err) {
       console.error('[PlatformsPage] Error loading accounts:', err);
-      setBanner({
-        type: 'error',
-        text: 'Failed to load linked platform accounts. Please refresh.',
-      });
+      toast.error('Failed to load linked platform accounts. Please refresh.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadPlatforms();
@@ -58,30 +53,21 @@ export const PlatformsPage = () => {
   // Sync a single platform
   const handleSyncPlatform = async (platformKey) => {
     setSyncingMap((prev) => ({ ...prev, [platformKey]: true }));
-    setBanner(null);
 
     try {
       const res = await platformsApi.syncPlatform(platformKey);
       if (res.success) {
-        setBanner({
-          type: 'success',
-          text: res.message || `Successfully synced ${platformKey}!`,
-        });
+        toast.success(res.message || `Successfully synced ${platformKey}!`);
         await loadPlatforms();
       } else {
-        setBanner({
-          type: 'error',
-          text: res.error?.message || `Sync failed for ${platformKey}.`,
-        });
+        toast.error(res.error?.message || `Sync failed for ${platformKey}.`);
       }
     } catch (err) {
-      setBanner({
-        type: 'error',
-        text:
-          err.response?.data?.error?.message ||
-          err.message ||
-          `Sync failed for ${platformKey}.`,
-      });
+      toast.error(
+        err.response?.data?.error?.message ||
+        err.message ||
+        `Sync failed for ${platformKey}.`
+      );
     } finally {
       setSyncingMap((prev) => ({ ...prev, [platformKey]: false }));
     }
@@ -91,7 +77,6 @@ export const PlatformsPage = () => {
   const handleSyncAll = async () => {
     if (platforms.length === 0) return;
     setIsSyncingAll(true);
-    setBanner(null);
 
     try {
       const results = await Promise.allSettled(
@@ -99,16 +84,12 @@ export const PlatformsPage = () => {
       );
 
       const successful = results.filter((r) => r.status === 'fulfilled' && r.value?.success).length;
-      setBanner({
-        type: 'success',
-        text: `Sync complete: ${successful} of ${platforms.length} accounts updated successfully.`,
-      });
+      toast.success(
+        `Sync complete: ${successful} of ${platforms.length} accounts updated successfully.`
+      );
       await loadPlatforms();
     } catch (err) {
-      setBanner({
-        type: 'error',
-        text: 'Error synchronizing some platforms. Please check individual status.',
-      });
+      toast.error('Error synchronizing some platforms. Please check individual status.');
     } finally {
       setIsSyncingAll(false);
     }
@@ -168,7 +149,7 @@ export const PlatformsPage = () => {
 
           <button
             type="button"
-            onClick={() => openConnectModal('LEETCODE')}
+            onClick={() => openConnectModal()}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 active:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -176,34 +157,6 @@ export const PlatformsPage = () => {
           </button>
         </div>
       </div>
-
-      {/* Banner / Toast notification */}
-      {banner && (
-        <div
-          className={`p-4 rounded-2xl text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
-            banner.type === 'success'
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300'
-              : 'bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {banner.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-            )}
-            <span className="font-medium">{banner.text}</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="text-[11px] font-semibold underline opacity-70 hover:opacity-100"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
 
       {/* Connection Summary Card */}
       <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#0c121e] border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -296,7 +249,7 @@ export const PlatformsPage = () => {
         initialPlatform={selectedPlatformForModal}
         connectedAccounts={platforms}
         onSuccess={(msg) => {
-          setBanner({ type: 'success', text: msg });
+          toast.success(msg);
           loadPlatforms();
         }}
       />
@@ -311,7 +264,7 @@ export const PlatformsPage = () => {
         platformName={unlinkModalState.platformName}
         username={unlinkModalState.username}
         onSuccess={(msg) => {
-          setBanner({ type: 'success', text: msg });
+          toast.info(msg);
           loadPlatforms();
         }}
       />
