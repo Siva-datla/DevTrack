@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ThemeToggle } from '../components/common/ThemeToggle';
-import { Terminal, Lock, Mail, ArrowRight, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { Terminal, Lock, Mail, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -34,12 +34,6 @@ export const LoginPage = () => {
     } else {
       setLocalError(result.error || 'Failed to sign in.');
     }
-  };
-
-  const fillDemoCredentials = () => {
-    setEmail('demo@devtrack.dev');
-    setPassword('demopass123');
-    setLocalError('');
   };
 
   return (
@@ -88,7 +82,7 @@ export const LoginPage = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="developer@example.com"
+                  placeholder="you@example.com"
                   required
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
@@ -134,18 +128,6 @@ export const LoginPage = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Helper */}
-          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/80">
-            <button
-              type="button"
-              onClick={fillDemoCredentials}
-              className="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Fill Demo Credentials (demo@devtrack.dev)</span>
-            </button>
-          </div>
 
           <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
             Don't have an account?{' '}
